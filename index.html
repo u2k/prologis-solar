@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>プロロジス 太陽光発電 ダッシュボード</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="./data.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
+         margin: 0; padding: 20px; background: #f5f7fa; color: #1f2937; }
+  h1 { margin: 0 0 4px 0; font-size: 24px; }
+  h2 { margin: 0 0 12px 0; font-size: 15px; color: #374151; }
+  .meta { color: #6b7280; font-size: 13px; margin-bottom: 24px; }
+  .section-title { font-size: 18px; font-weight: 600; margin: 32px 0 12px 0; color: #111827; display: flex; align-items: center; gap: 8px; }
+  .section-title .badge { font-size: 12px; padding: 2px 8px; background: #e0e7ff; color: #3730a3; border-radius: 12px; }
+  .grid { display: grid; gap: 20px; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); }
+  .grid-2 { display: grid; gap: 20px; grid-template-columns: 1fr 1fr; }
+  .card { background: #fff; border-radius: 8px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+  .card-wide { grid-column: 1 / -1; }
+  .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 20px; }
+  .kpi { background: #fff; padding: 16px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+  .kpi-label { font-size: 12px; color: #6b7280; }
+  .kpi-value { font-size: 24px; font-weight: 700; color: #111827; margin-top: 4px; }
+  .kpi-unit { font-size: 12px; color: #6b7280; margin-left: 4px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { padding: 6px 8px; text-align: right; border-bottom: 1px solid #e5e7eb; }
+  th:first-child, td:first-child { text-align: left; }
+  th { background: #f9fafb; font-weight: 600; }
+  .controls { margin-bottom: 16px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  select, button { padding: 6px 12px; border: 1px solid #d1d5db; border-radius: 6px; background: #fff; font-size: 13px; cursor: pointer; }
+  select:hover, button:hover { background: #f9fafb; }
+  .region-tag { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; background: #e0e7ff; color: #3730a3; }
+  .err { padding: 30px; text-align: center; color: #b91c1c; }
+  canvas { max-height: 320px; }
+  .comparison-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .comp-card { background: #fff; border-radius: 8px; padding: 16px; text-align: center; box-shadow: 0 1px 2px rgba(0,0,0,0.06); }
+  .comp-icon { font-size: 32px; margin-bottom: 4px; }
+  .comp-label { font-size: 13px; font-weight: 600; color: #1f2937; }
+  .comp-sublabel { font-size: 10px; color: #6b7280; margin: 2px 0 8px 0; }
+  .comp-value { font-size: 22px; font-weight: 700; color: #b45309; }
+  .comp-unit { font-size: 11px; color: #92400e; margin-left: 4px; }
+  @media (max-width: 800px) { .comparison-grid { grid-template-columns: repeat(2, 1fr); }}
+
+  .site-detail-kpi { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px; }
+  .site-detail-kpi .kpi { padding: 12px; }
+  .site-detail-kpi .kpi-value { font-size: 20px; }
+</style>
+</head>
+<body>
+<h1>☀️ プロロジス 太陽光発電 ダッシュボード</h1>
+<div class="meta" id="meta">読込中...</div>
+
+<div id="content" style="display:none">
+
+  <!-- === 全国KPI === -->
+  <div class="kpi-grid">
+    <div class="kpi"><div class="kpi-label">サイト数</div><div class="kpi-value" id="kpi-sites">-</div></div>
+    <div class="kpi"><div class="kpi-label">累計発電量</div><div class="kpi-value"><span id="kpi-total">-</span><span class="kpi-unit">MWh</span></div></div>
+    <div class="kpi"><div class="kpi-label">今年の発電量</div><div class="kpi-value"><span id="kpi-thisyear">-</span><span class="kpi-unit">MWh</span></div></div>
+    <div class="kpi"><div class="kpi-label">今月の発電量</div><div class="kpi-value"><span id="kpi-thismonth">-</span><span class="kpi-unit">MWh</span></div></div>
+  </div>
+
+  <!-- === 累計発電量の規模感（換算比較）=== -->
+  <div class="section-title">
+    <span>♻️ 累計発電量はこれだけの規模</span>
+    <span class="badge">自動換算</span>
+  </div>
+  <div class="card" style="background: linear-gradient(135deg, #fef3c7 0%, #fff7ed 100%);">
+    <div style="text-align: center; margin-bottom: 20px;">
+      <div style="font-size: 13px; color: #6b7280;">累計発電量</div>
+      <div style="font-size: 36px; font-weight: 800; color: #92400e;">
+        <span id="comp-total-mwh">-</span> <span style="font-size: 18px;">MWh</span>
+      </div>
+      <div style="font-size: 12px; color: #92400e; opacity: 0.7;">
+        （<span id="comp-total-kwh">-</span> kWh）
+      </div>
+    </div>
+    <div class="comparison-grid">
+      <div class="comp-card">
+        <div class="comp-icon">🏬</div>
+        <div class="comp-label">大型物流センター</div>
+        <div class="comp-sublabel">10万㎡ / 6,351 MWh・年</div>
+        <div class="comp-value"><span id="comp-large">-</span><span class="comp-unit">棟・年分</span></div>
+      </div>
+      <div class="comp-card">
+        <div class="comp-icon">🏪</div>
+        <div class="comp-label">中大型物流センター</div>
+        <div class="comp-sublabel">5万㎡ / 3,175 MWh・年</div>
+        <div class="comp-value"><span id="comp-medium">-</span><span class="comp-unit">棟・年分</span></div>
+      </div>
+      <div class="comp-card">
+        <div class="comp-icon">❄️</div>
+        <div class="comp-label">冷蔵・冷凍倉庫</div>
+        <div class="comp-sublabel">10万㎡ / 31,861 MWh・年</div>
+        <div class="comp-value"><span id="comp-cold">-</span><span class="comp-unit">棟・年分</span></div>
+      </div>
+      <div class="comp-card">
+        <div class="comp-icon">🏠</div>
+        <div class="comp-label">一般家庭</div>
+        <div class="comp-sublabel">3,911 kWh/年・世帯</div>
+        <div class="comp-value"><span id="comp-household">-</span><span class="comp-unit">世帯・年分</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- === 全国グラフ === -->
+  <div class="section-title"><span>🌏 全国サマリ</span></div>
+  <div class="grid">
+    <div class="card">
+      <h2>📈 全国 月別発電量推移</h2>
+      <canvas id="chart-monthly"></canvas>
+    </div>
+    <div class="card">
+      <h2>📊 全国 年別発電量（左→右：古→新）</h2>
+      <canvas id="chart-yearly"></canvas>
+    </div>
+    <div class="card">
+      <h2>🌏 地域別シェア（直近12ヶ月）</h2>
+      <canvas id="chart-region"></canvas>
+    </div>
+    <div class="card">
+      <h2>🏆 サイト別ランキング（今年累計）</h2>
+      <canvas id="chart-ranking"></canvas>
+    </div>
+  </div>
+
+  <!-- === サイト別詳細ビュー === -->
+  <div class="section-title">
+    <span>🏭 サイト別 詳細ビュー</span>
+    <span class="badge">サイトを選択</span>
+  </div>
+
+  <div class="card">
+    <div class="controls">
+      <label>サイト:
+        <select id="site-select"></select>
+      </label>
+      <span id="site-region" class="region-tag">-</span>
+    </div>
+
+    <!-- サイトKPI -->
+    <div class="site-detail-kpi">
+      <div class="kpi">
+        <div class="kpi-label">累計発電量</div>
+        <div class="kpi-value"><span id="site-total">-</span><span class="kpi-unit">MWh</span></div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">今年の発電量</div>
+        <div class="kpi-value"><span id="site-thisyear">-</span><span class="kpi-unit">MWh</span></div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">今月の発電量</div>
+        <div class="kpi-value"><span id="site-thismonth">-</span><span class="kpi-unit">MWh</span></div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div>
+        <h2>📊 年間発電量（左→右：古→新）</h2>
+        <canvas id="chart-site-yearly"></canvas>
+      </div>
+      <div>
+        <h2>📈 月間発電量推移</h2>
+        <canvas id="chart-site-monthly"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- === サイト一覧テーブル === -->
+  <div class="section-title"><span>📋 サイト別 詳細一覧</span></div>
+  <div class="card">
+    <div class="controls">
+      <label>年: <select id="year-select"></select></label>
+    </div>
+    <table id="site-table">
+      <thead><tr>
+        <th>サイト</th><th>地域</th>
+        <th>年間発電量 (MWh)</th>
+        <th>累計発電量 (MWh)</th>
+        <th>レコード数</th>
+      </tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+</div>
+
+<div class="err" id="err" style="display:none">
+  データが読み込めません。先に <code>run_06_aggregate.command</code> を実行してください。
+</div>
+
+<script>
+const D = window.SOLAR_DATA;
+const meta = document.getElementById('meta');
+const content = document.getElementById('content');
+const err = document.getElementById('err');
+
+if (!D || !D.sites) {
+  err.style.display = 'block';
+  meta.textContent = '';
+} else {
+  content.style.display = 'block';
+  const siteCount = Object.keys(D.sites).length;
+  meta.textContent = `集計日時: ${D.generated_at} ／ サイト数: ${siteCount}`;
+  
+  const fmt = n => n.toLocaleString('ja-JP', {maximumFractionDigits: 0});
+  const fmt1 = n => n.toLocaleString('ja-JP', {maximumFractionDigits: 1});
+  const toMWh = kwh => (kwh / 1000);
+  const thisYear = String(new Date().getFullYear());
+  const thisMonth = `${thisYear}-${String(new Date().getMonth()+1).padStart(2,'0')}`;
+  
+  // === 全国KPI ===
+  document.getElementById('kpi-sites').textContent = siteCount;
+  const total = Object.values(D.totals.yearly).reduce((a,b)=>a+b, 0);
+  document.getElementById('kpi-total').textContent = fmt(toMWh(total));
+  document.getElementById('kpi-thisyear').textContent = fmt(toMWh(D.totals.yearly[thisYear] || 0));
+  document.getElementById('kpi-thismonth').textContent = fmt(toMWh(D.totals.monthly[thisMonth] || 0));
+  
+  // === 累計発電量の換算比較 ===
+  const totalMWh = toMWh(total);
+  const totalKWh = total;
+  document.getElementById('comp-total-mwh').textContent = fmt(totalMWh);
+  document.getElementById('comp-total-kwh').textContent = fmt(totalKWh);
+  // 大型物流センター 10万㎡ = 6,351 MWh/年
+  document.getElementById('comp-large').textContent = fmt1(totalMWh / 6351);
+  // 中大型 5万㎡ = 3,175 MWh/年
+  document.getElementById('comp-medium').textContent = fmt1(totalMWh / 3175);
+  // 冷蔵・冷凍倉庫 10万㎡ = 31,861 MWh/年
+  document.getElementById('comp-cold').textContent = fmt1(totalMWh / 31861);
+  // 一般家庭 = 3,911 kWh/年（= 3.911 MWh）
+  document.getElementById('comp-household').textContent = fmt(totalKWh / 3911);
+
+  
+  // === 全国 月別推移 ===
+  const monthLabels = Object.keys(D.totals.monthly).sort();
+  const monthValues = monthLabels.map(k => toMWh(D.totals.monthly[k]));
+  new Chart(document.getElementById('chart-monthly'), {
+    type: 'line',
+    data: { labels: monthLabels, datasets: [{
+      label: 'MWh', data: monthValues, borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.1)', fill: true, tension: 0.2, pointRadius: 1
+    }]},
+    options: { plugins: { legend: { display: false }}, scales: { y: { title: { display: true, text: 'MWh' }, beginAtZero: true }}}
+  });
+  
+  // === 全国 年別（昇順）===
+  const yearLabelsAsc = Object.keys(D.totals.yearly).sort();
+  new Chart(document.getElementById('chart-yearly'), {
+    type: 'bar',
+    data: { labels: yearLabelsAsc, datasets: [{
+      label: 'MWh', data: yearLabelsAsc.map(y => toMWh(D.totals.yearly[y])), backgroundColor: '#10b981'
+    }]},
+    options: { plugins: { legend: { display: false }}, scales: { y: { title: { display: true, text: 'MWh' }, beginAtZero: true }}}
+  });
+  
+  // === 地域別 円グラフ ===
+  const recent12 = monthLabels.slice(-12);
+  const regionTotals = {};
+  for (const [region, rdata] of Object.entries(D.regions)) {
+    regionTotals[region] = recent12.reduce((sum, m) => sum + (rdata.monthly[m] || 0), 0);
+  }
+  new Chart(document.getElementById('chart-region'), {
+    type: 'doughnut',
+    data: {
+      labels: Object.keys(regionTotals),
+      datasets: [{
+        data: Object.values(regionTotals).map(toMWh),
+        backgroundColor: ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#6b7280']
+      }]
+    }
+  });
+  
+  // === サイトランキング ===
+  const ranking = Object.entries(D.sites)
+    .map(([name, s]) => ({name, value: toMWh(s.yearly[thisYear] || 0), region: s.region}))
+    .sort((a,b) => b.value - a.value);
+  new Chart(document.getElementById('chart-ranking'), {
+    type: 'bar',
+    data: {
+      labels: ranking.map(r => r.name),
+      datasets: [{ label: 'MWh', data: ranking.map(r => r.value), backgroundColor: '#6366f1' }]
+    },
+    options: { indexAxis: 'y', plugins: { legend: { display: false }}, scales: { x: { beginAtZero: true }}}
+  });
+  
+  // === サイト別 詳細ビュー ===
+  const siteSel = document.getElementById('site-select');
+  const sortedSites = Object.keys(D.sites).sort();
+  sortedSites.forEach(name => {
+    const opt = document.createElement('option');
+    opt.value = name; opt.textContent = name;
+    siteSel.appendChild(opt);
+  });
+  
+  let siteYearlyChart = null;
+  let siteMonthlyChart = null;
+  
+  function renderSite(siteName) {
+    const s = D.sites[siteName];
+    if (!s) return;
+    
+    document.getElementById('site-region').textContent = s.region || '未分類';
+    const siteTotal = Object.values(s.yearly).reduce((a,b)=>a+b, 0);
+    document.getElementById('site-total').textContent = fmt(toMWh(siteTotal));
+    document.getElementById('site-thisyear').textContent = fmt(toMWh(s.yearly[thisYear] || 0));
+    document.getElementById('site-thismonth').textContent = fmt(toMWh(s.monthly[thisMonth] || 0));
+    
+    // 年別
+    const siteYearLabels = Object.keys(s.yearly).sort();
+    if (siteYearlyChart) siteYearlyChart.destroy();
+    siteYearlyChart = new Chart(document.getElementById('chart-site-yearly'), {
+      type: 'bar',
+      data: { labels: siteYearLabels, datasets: [{
+        label: 'MWh',
+        data: siteYearLabels.map(y => toMWh(s.yearly[y])),
+        backgroundColor: '#10b981'
+      }]},
+      options: { plugins: { legend: { display: false }}, scales: { y: { title: { display: true, text: 'MWh' }, beginAtZero: true }}}
+    });
+    
+    // 月別
+    const siteMonthLabels = Object.keys(s.monthly).sort();
+    if (siteMonthlyChart) siteMonthlyChart.destroy();
+    siteMonthlyChart = new Chart(document.getElementById('chart-site-monthly'), {
+      type: 'line',
+      data: { labels: siteMonthLabels, datasets: [{
+        label: 'MWh',
+        data: siteMonthLabels.map(m => toMWh(s.monthly[m])),
+        borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.1)', fill: true, tension: 0.2, pointRadius: 1
+      }]},
+      options: { plugins: { legend: { display: false }}, scales: { y: { title: { display: true, text: 'MWh' }, beginAtZero: true }}}
+    });
+  }
+  
+  siteSel.addEventListener('change', e => renderSite(e.target.value));
+  renderSite(sortedSites[0]);
+  
+  // === テーブル（年セレクタ）===
+  const yearSel = document.getElementById('year-select');
+  const yearLabelsDesc = [...yearLabelsAsc].reverse();
+  yearLabelsDesc.forEach(y => {
+    const opt = document.createElement('option');
+    opt.value = y; opt.textContent = y + '年';
+    yearSel.appendChild(opt);
+  });
+  
+  function renderTable(year) {
+    const tbody = document.querySelector('#site-table tbody');
+    tbody.innerHTML = '';
+    const rows = Object.entries(D.sites)
+      .map(([name, s]) => ({
+        name, region: s.region,
+        value: s.yearly[year] || 0,
+        cumulative: Object.values(s.yearly).reduce((a,b)=>a+b, 0),
+        records: s.record_count || 0
+      }))
+      .sort((a,b) => b.value - a.value);
+    for (const r of rows) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${r.name}</td><td><span class="region-tag">${r.region}</span></td>` +
+                     `<td>${fmt(toMWh(r.value))}</td>` +
+                     `<td>${fmt(toMWh(r.cumulative))}</td>` +
+                     `<td>${fmt(r.records)}</td>`;
+      tbody.appendChild(tr);
+    }
+  }
+  yearSel.addEventListener('change', e => renderTable(e.target.value));
+  renderTable(yearLabelsDesc[0]);
+}
+</script>
+</body>
+</html>
